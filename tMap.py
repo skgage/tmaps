@@ -1,10 +1,15 @@
+#this is Sarah's initial attempt to do own FCN for each dim
+
 
 #---Imports--------------------
 import numpy as np
 import matplotlib.pyplot as plt
-import tensorflow as tf
 import genData
 import sys
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import tensorflow as tf
 from tensorflow.python.ops.parallel_for.gradients import jacobian
 
 #---Global Variables-----------
