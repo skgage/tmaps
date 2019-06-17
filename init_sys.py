@@ -8,6 +8,7 @@ from pathlib import Path
 import random 
 from datetime import datetime
 import genData
+import matplotlib.pyplot as plt
 
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -132,52 +133,134 @@ class TemporalConvNet(tf.layers.Layer):
         for layer in self.layers:
             outputs = layer(outputs, training=training)
         return outputs
+'''
+tf.reset_default_graph()
+with tf.Graph().as_default() as g:
+	tf.set_random_seed(10)
+	numSamps = 32
+	x = tf.random_normal((numSamps, 2, 1)) # (batch_size, length, channel)
+	is_training = tf.placeholder("bool")
+	tcn = TemporalConvNet([8, 8, 8, 1], 2, 0.25)
+	output = tcn(x, training=is_training)
+	dr = tf.reshape(tf.gradients(output, x), [numSamps, 2])
+	dr_log = tf.log(dr)
+	dr_log_nonan = tf.where(tf.is_nan(dr_log), tf.zeros_like(dr_log), dr_log)
+	print ('dr: ', tf.log(dr))
+	squaring = tf.square(tf.reshape(output, [numSamps,2]))
+	subtract = squaring - dr_log_nonan
+	summ = tf.reduce_sum(subtract)
+	#subtract = 
+	#dr = [grad if grad is not None else tf.zeros_like(var) for var, grad in zip(x, dr)]
+	#dr = tf.gradients(output, x)
+	loss = tf.reduce_sum((0.5*tf.square(tf.reshape(output, [numSamps,2])) - tf.log(dr)))/numSamps#/float(numSamps)
+	print ('loss is what: ', loss)
+	init = tf.global_variables_initializer()
+    
+with tf.Session(graph=g) as sess:
+    # Run the initializer
+    sess.run(init)
+    res = sess.run(output, {is_training: True})
+    for var in tf.trainable_variables():
+    	var_val = sess.run(var)
+    	print ('var name = ', var.name,' values = ', var_val)
+    	#converged_vars['{}'.format(var.name)]= var_val
+    #print(res[1, :, 1])
+    print(res.shape)   
+    print('output check: ', res)
+    dr_check, drlog_check, drlog_nan_check, subtract_check, sum_check = sess.run([dr, dr_log, dr_log_nonan, subtract, summ], {is_training: False})
+    squaring_check = sess.run(squaring, {is_training: False})
+    print ('check squaring: ', squaring_check)
+    print ('dr_check: ', dr_check)
+    print ('dr log check: ', drlog_check)
+    print ('dr log remove nan check: ', drlog_nan_check)
+    print ('subtraction check: ', subtract_check)
+    print ('reduce sum check: ', sum_check/numSamps)
+    error = sess.run(loss, {is_training: False})
+    print ('loss: ', error)
+'''
 
 
 tf.reset_default_graph()
 g = tf.Graph()
+numSamps = 500
 with g.as_default():
     #Xinput = tf.placeholder(tf.float32, shape=[None, 10, 4])
     tf.set_random_seed(10)
-    Xinput = tf.placeholder(tf.float32, shape=[None, 10, 4])
+    Xinput = tf.placeholder(tf.float32, shape=[None, 2, 1])
     is_training = tf.placeholder("bool")
     #numSamps = Xinput.shape[0]
-    tcn = TemporalConvNet([4, 4, 4], 2, 0.25) #num_channels, kernel size, dropout
+    tcn = TemporalConvNet([8,8,8,1], 2, 0.25) #num_channels, kernel size, dropout
     output = tcn(Xinput, training=is_training)
     output2 = tf.reshape(output, [-1,2])
     #logits = tf.layers.dense(output[:,-1,:], activation=tf.nn.relu, kernel_initializer=tf.orthogonal_initializer())
-    dr = tf.gradients(output2, Xinput)
-    loss = tf.reduce_sum((0.5*tf.square(output) - tf.log(dr)))/20#/float(numSamps)
-    optimizer = tf.train.AdamOptimizer(learning_rate = 0.001)
+    dr = tf.gradients(output, Xinput)
+    dr_log = tf.log(dr)
+    dr_log = tf.where(tf.is_nan(dr), tf.zeros_like(dr), dr)
+    loss = tf.reduce_sum((0.5*tf.square(output) - dr_log))/numSamps#/float(numSamps)
+    optimizer = tf.train.AdamOptimizer(learning_rate = 0.01)
     train = optimizer.minimize(loss)
     print(tcn.layers[0].down_sample)    
     init = tf.global_variables_initializer()
     
 with tf.Session(graph=g) as sess:
-    # Run the initializer
-    sess.run(init)
-    #data = np.reshape(genData.Banana(10), [-1, 2, 1])
-    data = np.random.randn(32, 10, 4)
-    print ('data: ', data)
-    #samps = sess.run(numSamps, {Xinput: data})
-    #print ('Number samples: ', samps)
-    for i in range(2):
-		res = sess.run(output2, {Xinput: data, is_training: True})
-		#sess.run(train, {Xinput: data, is_training: True})
-		#error = sess.run(loss, {Xinput: data, is_training: False})
-	    #res = sess.run(output, {Xinput: np.random.randn(32, 10, 4)})
-		print(res)   
+	# Run the initializer
+	sess.run(init)
+	#data = np.reshape(genData.Banana(10), [-1, 2, 1])
+	train_data = np.random.randn(numSamps, 2, 1)
+	train_data = np.reshape(genData.Banana(1000) ,[500,2,1])
+	test_data = np.random.randn(numSamps/5, 2, 1)
+	test_data = np.reshape(genData.Banana(1000), [500,2,1])
+	#print ('data: ', data)
+	#samps = sess.run(numSamps, {Xinput: data})
+	#print ('Number samples: ', samps)
+	loss_vec = []
+	n = 10
+	for i in range(n):
+		#res = sess.run(output2, {Xinput: data, is_training: True})
+		sess.run(train, {Xinput: train_data, is_training: True})
+		training_error = sess.run(loss, {Xinput: train_data, is_training: False})
+		#if training_error < 0.0001:
+			#break
+		#res = sess.run(output, {Xinput: np.random.randn(numSamps, 2, 1), is_training: False})
+		#print(res)   
 		#print(res[0, :, 0])
 
-		#print ('Epoch ', i, ' Objective: ', error)
-	    #print(res[1, :, 1])
-		converged_vars = {}
-		for var in tf.trainable_variables():
-			var_val = sess.run(var)
-	            #sh.write(trial+1,j,'{}'.format(var_val))
-	    	print ('var name = ', var.name,' values = ', var_val)
-	            #converged_vars['{}'.format(var.name)]= var_val
-	    #print ('vars: ', converged_vars)
+		print ('Epoch ', i, ' Objective: ', training_error)
+		loss_vec.append(training_error)
+	testing_error = sess.run(loss, {Xinput: test_data, is_training: False})
+	print ('Testing error: ', testing_error)
+	r = sess.run(output, {Xinput: train_data, is_training: False})
+	print ('r shape: ', r.shape)
+	r0 = r[:,0]
+	r1 = r[:,1]
+print ('r0: {}, r1: {}'.format(r0.shape, r1.shape))
+plt.figure()
+if i == n-1:
+	i = n
+plt.plot(np.linspace(0,i-1, i), np.array(loss_vec))
+plt.xlabel('epoch')
+plt.ylabel('objective')
+plt.title('TCN testing with KL divergence')
+plt.show()
+
+plt.figure()
+plt.scatter(train_data[:,0], train_data[:,1], alpha=0.2)
+plt.xlabel('x_1')
+plt.ylabel('x_2')
+plt.xlim([-4,4])
+plt.ylim([-4,4])
+plt.title('Target Samples')
+plt.show()
+
+plt.figure()
+plt.scatter(r0.ravel(),r1.ravel())
+plt.xlabel('r_1')
+plt.ylabel('r_2')
+plt.xlim([-4,4])
+plt.ylim([-4,4])
+plt.axis('equal')
+plt.title('Mapped Reference Samples')
+plt.show()
 	
 '''
 # Training Parameters
