@@ -1,4 +1,3 @@
-# This is Matt's original code since transform_tfMatt.py is being used for experiments
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,26 +24,59 @@ class GeneralDimension:
         self.layerSizes = layerSizes
         self.groupSizes = groupSizes
 
-        self.ws = monoLayer.add_variable('g_ws_%d_0'%d, shape=[self.d+1, layerSizes[0]])
-        self.bs = monoLayer.add_variable('g_bs_%d_0'%d, shape=[layerSizes[0]])
+        #self.ws = monoLayer.add_variable('g_ws_%d_0'%d, shape=[self.d+1, layerSizes[0]])
+        #self.bs = monoLayer.add_variable('g_bs_%d_0'%d, shape=[layerSizes[0]])
+
+        #for all components except the last one
+        self.ws = [None]*(numLayers)
+        self.bs = [None]*(numLayers)
+
+        self.ws[0] = monoLayer.add_variable('g_ws_%d_0'%d, shape=[self.d,layerSizes[0]])
+        self.bs[0] = monoLayer.add_variable('g_bs_%d_0'%d, shape=[layerSizes[0]])
+
+        i = 0
+        for i in range(1,numLayers-1):
+            self.ws[i] = monoLayer.add_variable('g_ws_%d_%d'%(d,i),shape=[layerSizes[i-1],layerSizes[i]])
+            self.bs[i] = monoLayer.add_variable('g_bs_%d_%i'%(d,i), shape=[layerSizes[i]])
+
+        self.ws[i+1] = monoLayer.add_variable('g_ws_%d_%d'%(d,i+1), shape=[layerSizes[i],self.d])
+        self.bs[i+1] = monoLayer.add_variable('g_bs_%d_%d'%(d,i+1), shape=[self.d])
+        #will concatenate the output from this layer with last component then continue to last layer
+        #layer for including monotone last component
+        self.wlast = monoLayer.add_variable('wlast_%d'%d, shape=[self.d+1,layerSizes[-1]])
+        self.blast = monoLayer.add_variable('blast_%d'%d, shape=[layerSizes[-1]])
 
     def Evaluate(self, x):
-        #print ('weight matrix before positive: ', self.ws)
-        #print ('x: ', x, tf.size(x))
-        #print ('weight matrix: ', self.ws)
-        monoVar = tf.reshape(np.exp((self.ws[-1,:])), [1, self.layerSizes[0]])
-        #print ('other weights: {}, mono part: {}'.format(self.ws[:-1,:], monoVar))
+        x_mono = x
         if self.d != 0:
-            w = tf.stack([self.ws[:-1, :], monoVar])
+            x_nonmono = x[:,:-1] #all components except the last component
+            #print ('x_nonmono: {}, self.d: {}'.format(x_nonmono.shape,self.d))
+            x_lastcomp = np.reshape(x[:,-1], [-1, 1])
+            numLayers = len(self.ws)
+            xLayers = [None]*numLayers
+            xLayers[0] = tf.nn.relu(tf.matmul(x_nonmono, self.ws[0]) + self.bs[0])
+            for i in range(1,numLayers):
+                xLayers[i] = tf.nn.relu(tf.matmul(xLayers[i-1], self.ws[i]) + self.bs[i])
+            #print ('self.ws: ', self.ws)
+            #print ('self.bs: ', self.bs)
+            #xLayers[-1] to be concatenated with the the last/monotone component
+            #print ('xLayer[-1]: {} x_lastcomp: {}'.format(xLayers[-1].shape, x_lastcomp.shape))
+            x_mono = tf.reshape(tf.stack([xLayers[-1], x_lastcomp]), [-1, self.d+1]) #input to monolayer    
+        
+        monoVar = tf.reshape(np.exp((self.wlast[-1,:])), [1, self.layerSizes[-1]])
+        #print ('other weights: {}, mono part: {}'.format(self.wlast[:-1,:].shape, monoVar))
+        if self.d != 0:
+            wmono = tf.stack([self.wlast[:-1, :], monoVar])
         else:
-            w = monoVar
+            wmono = monoVar
         #self.ws[-1,:] = monoVar 
         #x = np.reshape(x, [-1, self.d+1])
-        w = np.reshape(w, [self.d+1, self.layerSizes[0]])
+        wmono = np.reshape(wmono, [self.d+1, self.layerSizes[-1]])
         #print ('weight matrix: ', w)
         #print ('weight matrix: ', w)     
-        #print ('bias matrix: ', self.bs)                                   
-        xlayer = tf.matmul(x, w) + self.bs
+        #print ('bias matrix: ', self.bs)     
+        #print ('x_mono: {}, wmono: {}'.format(x_mono.shape, wmono.shape))                              
+        xlayer = tf.matmul(x_mono, wmono) + self.blast
         #print ('xlayer: ', xlayer)
         groupsIdx = [0]
         for i in range(len(self.groupSizes)):
@@ -82,9 +114,9 @@ class MonotoneLayer(tf.keras.layers.Layer):
         self.num_outputs = dim
         self.dim = dim
 
-        layerSizes = [16]
-        groupSizes = [4,4,4,4]
-        assert (np.sum(groupSizes) == layerSizes[0]),"Group sizes must sum to layer size."
+        layerSizes = [32,8] 
+        groupSizes = [2,2,2,2] #only used for the min-max layer
+        assert (np.sum(groupSizes) == layerSizes[-1]),"Group sizes must sum to layer size."
         #self.monoParts = [ MonotoneDimension(d, layerSizes, self) for d in range(dim)]
         self.genParts = [ GeneralDimension(d, layerSizes, groupSizes, self) for d in range(dim)]
         #print ('monoParts: ', self.monoParts)
@@ -102,7 +134,8 @@ class MonotoneLayer(tf.keras.layers.Layer):
         out = [self.genParts[d].Evaluate(input) for d in range(self.dim)]
         return out
 
-numSamps = 8000
+np.random.seed(0)
+numSamps = 4000
 halfNumSamps = int(0.5*numSamps)
 x1a = np.random.randn(halfNumSamps,1).astype('f')
 x1b = np.random.randn(halfNumSamps,1).astype('f') + 2
@@ -123,9 +156,11 @@ print ('xnump: ', xnump.shape)
 #xnump = genData.Banana(halfNumSamps)
 #print ('xnump PICK ME: ', xnump)
 #x = tf.constant(xnump)
-#plt.figure()
-#plt.hist(xnump[:,0], bins='auto')
-#plt.show()
+bins = 20
+data = xnump[:,0]
+plt.figure()
+plt.hist(xnump[:,0], bins=np.linspace(min(data), max(data), bins))
+plt.show()
 monoLayer = MonotoneLayer(xnump.shape[1])
 dim = xnump.shape[1]
 #x = np.random.randn(numSamps,1)
@@ -169,29 +204,38 @@ class GaussianKL:
 plt.figure()
 #fig, (ax1) = plt.subplots(nrows=1)
 #line1, = ax1.scatter(xnump[:,0],xnump[:,1])
-n = 300
-lr = 0.1
+n = 7000
+lr = 0.01
 opt = tf.train.AdamOptimizer(learning_rate=lr)
-for i in range(n):
+for i in range(1000):
     opt.minimize(GaussianKL(0), var_list=monoLayer.trainable_variables)
     #if (GaussianKL(0)().numpy() < 0):
         #print ('Error minimized to 0. Continuing to next dimension.')
         #break
     print('Dimension 0, Iteration %04d, Objective %04f'%(i,GaussianKL(0)().numpy()))
 r0 = monoLayer.genParts[0].Evaluate(np.reshape(xnump[:,0], [halfNumSamps, 1]))
-print ('r0: ', r0.shape)
-#plt.figure()
-#plt.hist(r0, bins='auto')
-#plt.show()
+print ('r0: ', r0.numpy().ravel().shape)
+#binwidth = 0.3
+plt.figure()
+data = r0.numpy().ravel()
+plt.hist(data, bins=np.linspace(min(data), max(data), bins))
+plt.title('Dimension 0 Mapped')
+plt.show()
 #plt.ion()
 opt = tf.train.AdamOptimizer(learning_rate=lr)
-for i in range(n):
+for i in range(1000):
     opt.minimize(GaussianKL(1), var_list=monoLayer.trainable_variables)
     #if (GaussianKL(1)().numpy() < 0):
         #print ('Error minimized to 0. Continuing to next dimension.')
         #break
     print('Dimension 1, Iteration %04d, Objective %04f'%(i,GaussianKL(1)().numpy()))
 r1 = monoLayer.genParts[1].Evaluate(np.reshape(xnump[:,:2], [halfNumSamps, 2]))
+plt.figure()
+data = r1.numpy().ravel()
+plt.hist(data, bins=np.linspace(min(data), max(data), bins))
+plt.title('Dimension 1 Mapped')
+plt.show()
+'''
 plt.scatter(r0.numpy().ravel(),r1.numpy().ravel(),alpha=0.2)
 plt.xlabel('r_1')
 plt.ylabel('r_2')
@@ -204,7 +248,7 @@ plt.pause(0.05)
 
 #plt.ioff()
 plt.show()
-
+'''
 
 
 '''
