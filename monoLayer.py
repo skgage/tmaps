@@ -114,8 +114,8 @@ class MonotoneLayer(tf.keras.layers.Layer):
         self.num_outputs = dim
         self.dim = dim
 
-        layerSizes = [32,8] 
-        groupSizes = [2,2,2,2] #only used for the min-max layer
+        layerSizes = [16,16] 
+        groupSizes = [4,4,4,4] #only used for the min-max layer
         assert (np.sum(groupSizes) == layerSizes[-1]),"Group sizes must sum to layer size."
         #self.monoParts = [ MonotoneDimension(d, layerSizes, self) for d in range(dim)]
         self.genParts = [ GeneralDimension(d, layerSizes, groupSizes, self) for d in range(dim)]
@@ -135,7 +135,7 @@ class MonotoneLayer(tf.keras.layers.Layer):
         return out
 
 np.random.seed(0)
-numSamps = 4000
+numSamps = 8000
 halfNumSamps = int(0.5*numSamps)
 x1a = np.random.randn(halfNumSamps,1).astype('f')
 x1b = np.random.randn(halfNumSamps,1).astype('f') + 2
@@ -190,7 +190,7 @@ class GaussianKL:
             #print ('r: ', r, r.shape)
             #print ('x: ', x, x.shape)
         dr = tf.slice(g.gradient(r, x), [0,self.d],[numSamps,1])
-        #print ('dr: ', dr)
+        print ('dr: ', dr.numpy(), tf.reduce_sum(dr))
         dr_log = tf.log(dr)
         #print ('dr_log: ', dr_log)
         dr_log_nonan = tf.where(tf.is_nan(dr_log), tf.zeros_like(dr_log), dr_log)
@@ -207,7 +207,7 @@ plt.figure()
 n = 7000
 lr = 0.01
 opt = tf.train.AdamOptimizer(learning_rate=lr)
-for i in range(1000):
+for i in range(300):
     opt.minimize(GaussianKL(0), var_list=monoLayer.trainable_variables)
     #if (GaussianKL(0)().numpy() < 0):
         #print ('Error minimized to 0. Continuing to next dimension.')
@@ -223,12 +223,25 @@ plt.title('Dimension 0 Mapped')
 plt.show()
 #plt.ion()
 opt = tf.train.AdamOptimizer(learning_rate=lr)
-for i in range(1000):
+for i in range(10000):
     opt.minimize(GaussianKL(1), var_list=monoLayer.trainable_variables)
     #if (GaussianKL(1)().numpy() < 0):
         #print ('Error minimized to 0. Continuing to next dimension.')
         #break
     print('Dimension 1, Iteration %04d, Objective %04f'%(i,GaussianKL(1)().numpy()))
+    if (i % 50 == 0):
+        r1 = monoLayer.genParts[1].Evaluate(xnump)
+        data = r1.numpy().ravel()
+        plt.hist(data, bins=np.linspace(min(data), max(data), bins))
+        #plt.scatter(r0.numpy().ravel(),r1.numpy().ravel(),alpha=0.2)
+        plt.xlabel('r_1')
+        plt.ylabel('r_2')
+        #plt.xlim([-4,4])
+        #plt.ylim([-4,4])
+        #plt.axis('equal')
+        plt.title('Mapped Reference Samples')
+        plt.pause(0.05)
+plt.show()
 r1 = monoLayer.genParts[1].Evaluate(np.reshape(xnump[:,:2], [halfNumSamps, 2]))
 plt.figure()
 data = r1.numpy().ravel()
