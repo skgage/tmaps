@@ -17,6 +17,10 @@ print(tf.keras.__version__)
 
 tf.enable_eager_execution()
 
+def init_fn(a, b):
+    m = np.zeros([a,b])
+    return m
+
 class GeneralDimension:
     def __init__(self,d,layerSizes_s1, layerSizes_t1, layerSizes_s2, layerSizes_t2, monoLayer):
         
@@ -37,69 +41,70 @@ class GeneralDimension:
 
         #for all components except the last one
         #NETWORK S1
-        numLayers = len(layerSizes_s1)
-        self.ws_s1 = [None]*(numLayers+1)
-        self.bs_s1 = [None]*(numLayers+1)
+        if self.d > 0:
+            numLayers = len(layerSizes_s1)
+            self.ws_s1 = [None]*(numLayers+1)
+            self.bs_s1 = [None]*(numLayers+1)
 
-        self.ws_s1[0] = monoLayer.add_variable('g_ws_s1_%d_0'%d, shape=[self.d,layerSizes_s1[0]])
-        self.bs_s1[0] = monoLayer.add_variable('g_bs_s1_%d_0'%d, shape=[layerSizes_s1[0]])
+            self.ws_s1[0] = monoLayer.add_variable('g_ws_s1_%d_0'%d, shape=[self.d,layerSizes_s1[0]], initializer='zeros')
+            self.bs_s1[0] = monoLayer.add_variable('g_bs_s1_%d_0'%d, shape=[layerSizes_s1[0]], initializer='zeros')
 
-        i = 0
-        for i in range(1,numLayers):
-            self.ws_s1[i] = monoLayer.add_variable('g_ws_s1_%d_%d'%(d,i),shape=[layerSizes_s1[i-1],layerSizes_s1[i]])
-            self.bs_s1[i] = monoLayer.add_variable('g_bs_s1_%d_%i'%(d,i), shape=[layerSizes_s1[i]])
+            i = 0
+            for i in range(1,numLayers):
+                self.ws_s1[i] = monoLayer.add_variable('g_ws_s1_%d_%d'%(d,i),shape=[layerSizes_s1[i-1],layerSizes_s1[i]], initializer='zeros')
+                self.bs_s1[i] = monoLayer.add_variable('g_bs_s1_%d_%i'%(d,i), shape=[layerSizes_s1[i]], initializer='zeros')
 
-        self.ws_s1[i+1] = monoLayer.add_variable('g_ws_s1%d_%d'%(d,i+1), shape=[layerSizes_s1[i],self.d])
-        self.bs_s1[i+1] = monoLayer.add_variable('g_bs_s1%d_%d'%(d,i+1), shape=[self.d])
+            self.ws_s1[i+1] = monoLayer.add_variable('g_ws_s1%d_%d'%(d,i+1), shape=[layerSizes_s1[i],self.d], initializer='zeros')
+            self.bs_s1[i+1] = monoLayer.add_variable('g_bs_s1%d_%d'%(d,i+1), shape=[self.d], initializer='zeros')
 
-        #NETWORK T1
-        numLayers = len(layerSizes_t1)
-        self.ws_t1 = [None]*(numLayers+1)
-        self.bs_t1 = [None]*(numLayers+1)
+            #NETWORK T1
+            numLayers = len(layerSizes_t1)
+            self.ws_t1 = [None]*(numLayers+1)
+            self.bs_t1 = [None]*(numLayers+1)
 
-        self.ws_t1[0] = monoLayer.add_variable('g_ws_t1_%d_0'%d, shape=[self.d,layerSizes_t1[0]])
-        self.bs_t1[0] = monoLayer.add_variable('g_bs_t1_%d_0'%d, shape=[layerSizes_t1[0]])
+            self.ws_t1[0] = monoLayer.add_variable('g_ws_t1_%d_0'%d, shape=[self.d,layerSizes_t1[0]], initializer='zeros')
+            self.bs_t1[0] = monoLayer.add_variable('g_bs_t1_%d_0'%d, shape=[layerSizes_t1[0]], initializer='zeros')
 
-        i = 0
-        for i in range(1,numLayers):
-            self.ws_t1[i] = monoLayer.add_variable('g_ws_t1_%d_%d'%(d,i),shape=[layerSizes_t1[i-1],layerSizes_t1[i]])
-            self.bs_t1[i] = monoLayer.add_variable('g_bs_t1_%d_%i'%(d,i), shape=[layerSizes_t1[i]])
+            i = 0
+            for i in range(1,numLayers):
+                self.ws_t1[i] = monoLayer.add_variable('g_ws_t1_%d_%d'%(d,i),shape=[layerSizes_t1[i-1],layerSizes_t1[i]], initializer='zeros')
+                self.bs_t1[i] = monoLayer.add_variable('g_bs_t1_%d_%i'%(d,i), shape=[layerSizes_t1[i]], initializer='zeros')
 
-        self.ws_t1[i+1] = monoLayer.add_variable('g_ws_t1_%d_%d'%(d,i+1), shape=[layerSizes_t1[i],self.d])
-        self.bs_t1[i+1] = monoLayer.add_variable('g_bs_t1_%d_%d'%(d,i+1), shape=[self.d])
+            self.ws_t1[i+1] = monoLayer.add_variable('g_ws_t1_%d_%d'%(d,i+1), shape=[layerSizes_t1[i],self.d], initializer='zeros')
+            self.bs_t1[i+1] = monoLayer.add_variable('g_bs_t1_%d_%d'%(d,i+1), shape=[self.d], initializer='zeros')
 
 
-        #NETWORK S2
-        numLayers = len(layerSizes_s2)
-        self.ws_s2 = [None]*(numLayers+1)
-        self.bs_s2 = [None]*(numLayers+1)
+            #NETWORK S2
+            numLayers = len(layerSizes_s2)
+            self.ws_s2 = [None]*(numLayers+1)
+            self.bs_s2 = [None]*(numLayers+1)
 
-        self.ws_s2[0] = monoLayer.add_variable('g_ws_s2_%d_0'%d, shape=[self.d,layerSizes_s2[0]])
-        self.bs_s2[0] = monoLayer.add_variable('g_bs_s2_%d_0'%d, shape=[layerSizes_s2[0]])
+            self.ws_s2[0] = monoLayer.add_variable('g_ws_s2_%d_0'%d, shape=[self.d,layerSizes_s2[0]], initializer='zeros')
+            self.bs_s2[0] = monoLayer.add_variable('g_bs_s2_%d_0'%d, shape=[layerSizes_s2[0]], initializer='zeros')
 
-        i = 0
-        for i in range(1,numLayers):
-            self.ws_s2[i] = monoLayer.add_variable('g_ws_s2_%d_%d'%(d,i),shape=[layerSizes_s2[i-1],layerSizes_s2[i]])
-            self.bs_s2[i] = monoLayer.add_variable('g_bs_s2_%d_%i'%(d,i), shape=[layerSizes_s2[i]])
+            i = 0
+            for i in range(1,numLayers):
+                self.ws_s2[i] = monoLayer.add_variable('g_ws_s2_%d_%d'%(d,i),shape=[layerSizes_s2[i-1],layerSizes_s2[i]], initializer='zeros')
+                self.bs_s2[i] = monoLayer.add_variable('g_bs_s2_%d_%i'%(d,i), shape=[layerSizes_s2[i]], initializer='zeros')
 
-        self.ws_s2[i+1] = monoLayer.add_variable('g_ws_s2_%d_%d'%(d,i+1), shape=[layerSizes_s2[i],self.d])
-        self.bs_s2[i+1] = monoLayer.add_variable('g_bs_s2_%d_%d'%(d,i+1), shape=[self.d])
+            self.ws_s2[i+1] = monoLayer.add_variable('g_ws_s2_%d_%d'%(d,i+1), shape=[layerSizes_s2[i],self.d], initializer='zeros')
+            self.bs_s2[i+1] = monoLayer.add_variable('g_bs_s2_%d_%d'%(d,i+1), shape=[self.d], initializer='zeros')
 
-        #NETWORK T2
-        numLayers = len(layerSizes_t2)
-        self.ws_t2 = [None]*(numLayers+1)
-        self.bs_t2 = [None]*(numLayers+1)
+            #NETWORK T2
+            numLayers = len(layerSizes_t2)
+            self.ws_t2 = [None]*(numLayers+1)
+            self.bs_t2 = [None]*(numLayers+1)
 
-        self.ws_t2[0] = monoLayer.add_variable('g_ws_t2_%d_0'%d, shape=[self.d,layerSizes_t2[0]])
-        self.bs_t2[0] = monoLayer.add_variable('g_bs_t2_%d_0'%d, shape=[layerSizes_t2[0]])
+            self.ws_t2[0] = monoLayer.add_variable('g_ws_t2_%d_0'%d, shape=[self.d,layerSizes_t2[0]], initializer='zeros')
+            self.bs_t2[0] = monoLayer.add_variable('g_bs_t2_%d_0'%d, shape=[layerSizes_t2[0]], initializer='zeros')
 
-        i = 0
-        for i in range(1,numLayers):
-            self.ws_t2[i] = monoLayer.add_variable('g_ws_t2_%d_%d'%(d,i),shape=[layerSizes_t2[i-1],layerSizes_t2[i]])
-            self.bs_t2[i] = monoLayer.add_variable('g_bs_t2_%d_%i'%(d,i), shape=[layerSizes_t2[i]])
+            i = 0
+            for i in range(1,numLayers):
+                self.ws_t2[i] = monoLayer.add_variable('g_ws_t2_%d_%d'%(d,i),shape=[layerSizes_t2[i-1],layerSizes_t2[i]], initializer='zeros')
+                self.bs_t2[i] = monoLayer.add_variable('g_bs_t2_%d_%i'%(d,i), shape=[layerSizes_t2[i]], initializer='zeros')
 
-        self.ws_t2[i+1] = monoLayer.add_variable('g_ws_t2_%d_%d'%(d,i+1), shape=[layerSizes_t2[i],self.d])
-        self.bs_t2[i+1] = monoLayer.add_variable('g_bs_t2_%d_%d'%(d,i+1), shape=[self.d])
+            self.ws_t2[i+1] = monoLayer.add_variable('g_ws_t2_%d_%d'%(d,i+1), shape=[layerSizes_t2[i],self.d], initializer='zeros')
+            self.bs_t2[i+1] = monoLayer.add_variable('g_bs_t2_%d_%d'%(d,i+1), shape=[self.d], initializer='zeros')
 
 
         #will concatenate the output from this layer with last component then continue to last layer
@@ -123,18 +128,18 @@ class GeneralDimension:
             for i in range(1,numLayers):
                 xLayers[i] = tf.matmul(xLayers[i-1], self.ws_s1[i]) + self.bs_s1[i]
             s1_out = tf.exp(xLayers[i])
-            print ('s1_out: ', s1_out, xLayers[i])
+            #print ('s1_out: ', s1_out, xLayers[i])
             numLayers = len(self.ws_t1)
             xLayers = [None]*numLayers
             xLayers[0] = tf.matmul(x_nonmono, self.ws_t1[0]) + self.bs_t1[0]
             for i in range(1,numLayers):
                 xLayers[i] = tf.matmul(xLayers[i-1], self.ws_t1[i]) + self.bs_t1[i]
             t1_out = xLayers[i]
-            print ('t1_out: ', t1_out, xLayers[i])
+            #print ('t1_out: ', t1_out, xLayers[i])
 
             y1_1 = x_nonmono*tf.exp(self.ws_first1) + self.ts_first1 #first layer output components
             y2_1 = x_lastcomp*s1_out + t1_out
-            print ('y2_1: ', y2_1)
+            #print ('y2_1: ', y2_1)
             '''
             x_nonmono = tf.reshape(y1_1, [-1,1])
             x_lastcomp = tf.reshape(y2_1, [-1,1])
@@ -196,7 +201,7 @@ class MonotoneLayer(tf.keras.layers.Layer):
         return out
 
 np.random.seed(0)
-numSamps = 20
+numSamps = 1000
 halfNumSamps = int(0.5*numSamps)
 x1a = np.random.randn(halfNumSamps,1).astype('f')
 x1b = np.random.randn(halfNumSamps,1).astype('f') + 2
@@ -218,7 +223,7 @@ print ('xnump: ', xnump.shape)
 #print ('xnump PICK ME: ', xnump)
 #x = tf.constant(xnump)
 #plt.figure()
-#plt.hist(xnump[:,0], bins='auto')
+#plt.hist(xnump[:,1], bins='auto')
 #plt.show()
 monoLayer = MonotoneLayer(xnump.shape[1])
 dim = xnump.shape[1]
@@ -245,18 +250,22 @@ class GaussianKL:
             g.watch(x)
             #we only use d-1 columns of x for each h() and g() functions (also used in evaluation below)
             #r = monoLayer.genParts[self.d].Evaluate(x[:,:self.d+1]) + monoLayer.monoParts[self.d].Evaluate(x[:,:self.d+1])
-            r = monoLayer.genParts[self.d].Evaluate(x[:,:self.d+1])
-            print ('r: ', r, r.shape)
+            r = monoLayer.genParts[self.d].Evaluate(x) #[:,:self.d+1])
+            #print ('r: ', r, r.shape)
             #print ('x: ', x, x.shape)
         #print ('gradient before slicing: ',g.gradient(r,x))
+        #print ('x: ', x)
         dr = tf.slice(g.gradient(r, x), [0,self.d],[numSamps,1])
+        #dr = g.gradient(r, x)
+        
+        #print ('second dr test: ', tf.gradients(r,x))
         #dr = g.gradient(r, x)
         print ('dr: ', dr)
         dr_log = tf.log(dr)
-        print ('dr_log: ', dr_log)
+        #print ('dr_log: ', dr_log)
         dr_log_nonan = tf.where(tf.is_nan(dr_log), tf.zeros_like(dr_log), dr_log)
         dr_log_nonan = tf.where(tf.is_inf(tf.math.abs(dr_log)), tf.zeros_like(dr_log_nonan), dr_log_nonan)
-        print ('dr_log_nonan: ', dr_log_nonan)
+        #print ('dr_log_nonan: ', dr_log_nonan)
         return tf.reduce_sum((0.5*tf.square(r) - dr_log_nonan))/float(numSamps)
 
 #def animate(i):
@@ -268,7 +277,7 @@ bins = 20
 n = 7000
 lr = 0.01
 opt = tf.train.AdamOptimizer(learning_rate=lr)
-for i in range(1):
+for i in range(200):
     opt.minimize(GaussianKL(0), var_list=monoLayer.trainable_variables)
     #if (GaussianKL(0)().numpy() < 0):
         #print ('Error minimized to 0. Continuing to next dimension.')
@@ -283,21 +292,15 @@ plt.title('Dimension 0 Mapped')
 plt.show()
 #plt.ion()
 opt = tf.train.AdamOptimizer(learning_rate=lr)
-for i in range(1):
+for i in range(1000):
     opt.minimize(GaussianKL(1), var_list=monoLayer.trainable_variables)
     #if (GaussianKL(1)().numpy() < 0):
         #print ('Error minimized to 0. Continuing to next dimension.')
         #break
     print('Dimension 1, Iteration %04d, Objective %04f'%(i,GaussianKL(1)().numpy()))
-    if (i % 50 == 0):
+    if (i % 100 == 0):
         r1 = monoLayer.genParts[1].Evaluate(np.reshape(xnump[:,:2], [halfNumSamps, 2]))
-        plt.figure()
-        data = r1.numpy().ravel()
-        plt.hist(data, bins=np.linspace(min(data), max(data), bins))
-        plt.title('Dimension 1 Mapped')
-        plt.pause(0.05)
-#plt.show()
-        '''
+        
         plt.scatter(r0.numpy().ravel(),r1.numpy().ravel(),alpha=0.2)
         plt.xlabel('r_1')
         plt.ylabel('r_2')
@@ -305,9 +308,25 @@ for i in range(1):
         plt.ylim([-4,4])
         plt.axis('equal')
         plt.title('Mapped Reference Samples')
-        #plt.show()
-        plt.pause(0.05)
         '''
+        plt.figure()
+        data = r1.numpy().ravel()
+        plt.hist(data, bins=np.linspace(min(data), max(data), bins))
+        plt.title('Dimension 1 Mapped')
+        '''
+        plt.pause(0.05)
+plt.show()
+
+plt.scatter(r0.numpy().ravel(),r1.numpy().ravel(),alpha=0.2)
+plt.xlabel('r_1')
+plt.ylabel('r_2')
+plt.xlim([-4,4])
+plt.ylim([-4,4])
+plt.axis('equal')
+plt.title('Mapped Reference Samples')
+#plt.show()
+plt.pause(0.05)
+        
         #plt.ioff()
 plt.show()
 
