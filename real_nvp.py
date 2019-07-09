@@ -117,36 +117,37 @@ class GeneralDimension:
             #print ('x_nonmono: ', x_nonmono)
             x_first = x[:,0]
             #print ('x_nonmono: {}, self.d: {}'.format(x_nonmono.shape,self.d))
-            x_lastcomp = np.reshape(x[:,-1], [-1, 1])
+            x_lastcomp = tf.reshape(x[:,-1], [-1, 1])
             #print ('x_lastcomp: ', x_lastcomp.shape)
             #plt.figure()
             #plt.hist(x_lastcomp, bins='auto')
             #plt.show()
             numLayers = len(self.ws_s1)
-            xLayers = [None]*numLayers
+            xLayers1 = [None]*numLayers
             #print ('ws_s1[0]: ', self.ws_s1[0], tf.reduce_sum(self.ws_s1[0]))
-            xLayers[0] = tf.nn.relu(tf.matmul(x_nonmono, self.ws_s1[0]) + self.bs_s1[0])
+            xLayers1[0] = tf.nn.relu(tf.matmul(x_nonmono, self.ws_s1[0]) + self.bs_s1[0])
             for i in range(1,numLayers):
-                xLayers[i] = tf.matmul(xLayers[i-1], self.ws_s1[i]) + self.bs_s1[i]
+                xLayers1[i] = tf.matmul(xLayers1[i-1], self.ws_s1[i]) + self.bs_s1[i]
                 #print ('ws_s1[{}]: {}'.format(i, self.ws_s1[i]), tf.reduce_sum(self.ws_s1[i]))
                 if i != numLayers - 1:
-                    xLayers[i] = tf.nn.relu(xLayers[i])
-            s1_out = tf.square(xLayers[i])
-            #print ('s1_out: ', s1_out, xLayers[i])
+                    xLayers1[i] = tf.nn.relu(xLayers1[i])
+            s1_out = tf.square(xLayers1[-1])
+            #print ('s1_out: ', s1_out, xLayers1[i])
             numLayers = len(self.ws_t1)
-            xLayers = [None]*numLayers
-            xLayers[0] = tf.nn.relu(tf.matmul(x_nonmono, self.ws_t1[0]) + self.bs_t1[0])
+            xLayers2 = [None]*numLayers
+            xLayers2[0] = tf.nn.relu(tf.matmul(x_nonmono, self.ws_t1[0]) + self.bs_t1[0])
             #print ('ws_t1[0]: ', self.ws_t1[0], tf.reduce_sum(self.ws_t1[0]))
             for i in range(1,numLayers):
                 #print (i, ' of numLayers: ', numLayers)
-                xLayers[i] = tf.matmul(xLayers[i-1], self.ws_t1[i]) + self.bs_t1[i]
+                xLayers2[i] = tf.matmul(xLayers2[i-1], self.ws_t1[i]) + self.bs_t1[i]
                 #print ('ws_t1[{}]: {}'.format(i, self.ws_t1[i]), tf.reduce_sum(self.ws_t1[i]))
                 if i != numLayers - 1:
-                    xLayers[i] = tf.nn.relu(xLayers[i])
-            t1_out = xLayers[i]
-            #print ('t1_out: ', t1_out, xLayers[i])
+                    xLayers2[i] = tf.nn.relu(xLayers2[i])
+            t1_out = xLayers2[-1]
+            #print ('t1_out: ', t1_out, xLayers2[i])
 
             y1_1 = x_nonmono*tf.exp(self.ws_first1) + self.ts_first1 #first layer output components
+            #print ('x_lastcomp: ', x_lastcomp.shape)
             y2_1 = x_lastcomp*s1_out + t1_out
             #print ('y2_1: ', y2_1)
             
@@ -154,19 +155,19 @@ class GeneralDimension:
             x_lastcomp = tf.reshape(y2_1, [-1,1])
             #Now to compute coupled layer outputs
             numLayers = len(self.ws_s2)
-            xLayers = [None]*numLayers
-            xLayers[0] = tf.matmul(x_nonmono, self.ws_s2[0]) + self.bs_s2[0]
+            xLayers3 = [None]*numLayers
+            xLayers3[0] = tf.matmul(x_nonmono, self.ws_s2[0]) + self.bs_s2[0]
             for i in range(1,numLayers):
-                xLayers[i] = tf.matmul(xLayers[i-1], self.ws_s2[i]) + self.bs_s2[i]
-            s2_out = tf.square(xLayers[i])
-
+                xLayers3[i] = tf.matmul(xLayers3[i-1], self.ws_s2[i]) + self.bs_s2[i]
+            s2_out = tf.square(xLayers3[-1])
+            #print ('s2: ', s2_out)
             numLayers = len(self.ws_t2)
-            xLayers = [None]*numLayers
-            xLayers[0] = tf.matmul(x_nonmono, self.ws_t2[0]) + self.bs_t2[0]
+            xLayers4 = [None]*numLayers
+            xLayers4[0] = tf.matmul(x_nonmono, self.ws_t2[0]) + self.bs_t2[0]
             for i in range(1,numLayers):
-                xLayers[i] = tf.matmul(xLayers[i-1], self.ws_t2[i]) + self.bs_t2[i]
-            t2_out = xLayers[i]
-
+                xLayers4[i] = tf.matmul(xLayers4[i-1], self.ws_t2[i]) + self.bs_t2[i]
+            t2_out = xLayers4[-1]
+            #print ('t2: ', t2_out)
             #y1_2 = x_first*np.exp(self.ws_first2) + self.ts_first2 #second layer output components
             y2_2 = x_lastcomp*s2_out + t2_out
             #print ('y2_2: ', y2_2)
@@ -187,10 +188,10 @@ class MonotoneLayer(tf.keras.layers.Layer):
         self.num_outputs = dim
         self.dim = dim
 
-        layerSizes_s1 = [4] 
-        layerSizes_t1 = [1]
-        layerSizes_s2 = [1]
-        layerSizes_t2 = [1]
+        layerSizes_s1 = [4,4] 
+        layerSizes_t1 = [4,4]
+        layerSizes_s2 = [4,4]
+        layerSizes_t2 = [4,4]
         #groupSizes = [2,2,2,2] #only used for the min-max layer
         #assert (np.sum(groupSizes) == layerSizes[-1]),"Group sizes must sum to layer size."
         #self.monoParts = [ MonotoneDimension(d, layerSizes, self) for d in range(dim)]
@@ -261,10 +262,11 @@ class GaussianKL:
             #we only use d-1 columns of x for each h() and g() functions (also used in evaluation below)
             #r = monoLayer.genParts[self.d].Evaluate(x[:,:self.d+1]) + monoLayer.monoParts[self.d].Evaluate(x[:,:self.d+1])
             r = monoLayer.genParts[self.d].Evaluate(x) #[:,:self.d+1])
-            print ('r: ', r, r.shape)
+            #r1 = monoLayer.genParts[1].Evaluate(x)
+            #print ('r: ', r, r.shape)
             #print ('x: ', x, x.shape)
-        dr = tf.slice(g.gradient(r, x), [0,self.d],[numSamps,1])
-        
+            dr = tf.slice(g.gradient(r, x), [0,self.d],[numSamps,1])
+            #dr = g.gradient(r, x)
         #r = monoLayer.genParts[self.d].Evaluate(x) #[:,:self.d+1])
         #print ('r: ', r, r.shape)
         #print ('gradient before slicing: ',g.gradient(r,x))
@@ -274,7 +276,7 @@ class GaussianKL:
         
         #print ('second dr test: ', tf.gradients(r,x))
         #dr = g.gradient(r, x)
-        print ('dr: ', dr.numpy(), tf.reduce_sum(dr))
+        #print ('dr: ', dr.numpy(), tf.reduce_sum(dr))
         dr_log = tf.log(dr)
         #print ('dr_log: ', dr_log)
         dr_log_nonan = dr_log
@@ -292,24 +294,27 @@ bins = 20
 n = 7000
 lr = 0.01
 opt = tf.train.AdamOptimizer(learning_rate=lr)
-for i in range(0):
+for i in range(500):
     opt.minimize(GaussianKL(0), var_list=monoLayer.trainable_variables)
     #if (GaussianKL(0)().numpy() < 0):
         #print ('Error minimized to 0. Continuing to next dimension.')
         #break
     print('Dimension 0, Iteration %04d, Objective %04f'%(i,GaussianKL(0)().numpy()))
-r0 = monoLayer.genParts[0].Evaluate(np.reshape(xnump[:,0], [halfNumSamps, 1]))
-print ('r0: ', r0.shape)
+    if i % 100 == 0:
+        r0 = monoLayer.genParts[0].Evaluate(np.reshape(xnump[:,0], [halfNumSamps, 1]))
+        print ('r0: ', r0.shape)
 
-plt.figure()
-data = r0.numpy().ravel()
-plt.hist(data, bins=np.linspace(min(data), max(data), bins))
-plt.title('Dimension 0 Mapped')
+        plt.figure()
+        data = r0.numpy().ravel()
+        plt.hist(data, bins=np.linspace(min(data), max(data), bins))
+        plt.title('Dimension 0 Mapped')
+        plt.pause(0.05)
 plt.show()
 
 #plt.ion()
+lr = 0.01
 opt = tf.train.AdamOptimizer(learning_rate=lr)
-for i in range(300):
+for i in range(30000):
     opt.minimize(GaussianKL(1), var_list=monoLayer.trainable_variables)
     #if i == 0:
         #start = monoLayer.trainable_variables
@@ -319,9 +324,9 @@ for i in range(300):
     #for var in monoLayer.trainable_variables:
         #print (var)
     print('Dimension 1, Iteration %04d, Objective %04f'%(i,GaussianKL(1)().numpy()))
-    if (i % 50 == 0):
+    if (i % 100 == 0):
         r1 = monoLayer.genParts[1].Evaluate(xnump)
-        
+        plt.figure()
         plt.scatter(r0.numpy().ravel(),r1.numpy().ravel(),alpha=0.2)
         plt.xlabel('r_1')
         plt.ylabel('r_2')
