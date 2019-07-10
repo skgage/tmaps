@@ -31,10 +31,10 @@ class GeneralDimension:
         #self.ws = monoLayer.add_variable('g_ws_%d_0'%d, shape=[self.d+1, layerSizes[0]])
         #self.bs = monoLayer.add_variable('g_bs_%d_0'%d, shape=[layerSizes[0]])
 
-        self.ws_first1 = monoLayer.add_variable('g_ws_first1_%d'%d, shape=[1])
-        self.ts_first1 = monoLayer.add_variable('g_ts_first1_%d'%d, shape=[1])
-        self.ws_first2 = monoLayer.add_variable('g_ws_first2_%d'%d, shape=[1])
-        self.ts_first2 = monoLayer.add_variable('g_ts_first2_%d'%d, shape=[1])
+        self.ws_first1 = monoLayer.add_variable('g_ws_first1', shape=[1])
+        self.ts_first1 = monoLayer.add_variable('g_ts_first1', shape=[1])
+        self.ws_first2 = monoLayer.add_variable('g_ws_first2', shape=[1])
+        self.ts_first2 = monoLayer.add_variable('g_ts_first2', shape=[1])
 
         #for all components except the last one
         #NETWORK S1
@@ -168,7 +168,7 @@ class GeneralDimension:
                 xLayers4[i] = tf.matmul(xLayers4[i-1], self.ws_t2[i]) + self.bs_t2[i]
             t2_out = xLayers4[-1]
             #print ('t2: ', t2_out)
-            #y1_2 = x_first*np.exp(self.ws_first2) + self.ts_first2 #second layer output components
+            #y1_2 = x_nonmono*np.exp(self.ws_first2) + self.ts_first2 #second layer output components
             y2_2 = x_lastcomp*s2_out + t2_out
             #print ('y2_2: ', y2_2)
             
@@ -188,10 +188,10 @@ class MonotoneLayer(tf.keras.layers.Layer):
         self.num_outputs = dim
         self.dim = dim
 
-        layerSizes_s1 = [4,4] 
-        layerSizes_t1 = [4,4]
-        layerSizes_s2 = [4,4]
-        layerSizes_t2 = [4,4]
+        layerSizes_s1 = [8,8,8] 
+        layerSizes_t1 = [8,8,8]
+        layerSizes_s2 = [8,8,8]
+        layerSizes_t2 = [8,8,8]
         #groupSizes = [2,2,2,2] #only used for the min-max layer
         #assert (np.sum(groupSizes) == layerSizes[-1]),"Group sizes must sum to layer size."
         #self.monoParts = [ MonotoneDimension(d, layerSizes, self) for d in range(dim)]
@@ -220,22 +220,30 @@ x1b = np.random.randn(halfNumSamps,1).astype('f') + 2
 x2a = np.cos(x1a) + 0.3*np.random.randn(halfNumSamps,1).astype('f')
 x2b = np.cos(x1b) - 2.0 + 0.2*np.random.randn(halfNumSamps,1).astype('f')
 
-x1 = x1a;#np.concatenate([x1a,x1b])
+a = np.random.normal(10,1,int(0.5*halfNumSamps))
+b = np.random.normal(5,2,int(0.5*halfNumSamps))
+c = np.hstack([a.reshape(-1,1),b.reshape(-1,1)])
+x1 = x1a #c.astype('float32');#np.concatenate([x1a,x1b])
 x2 = x2a;#np.concatenate([x2a,x2b])
+#x1 = x2a
+#x2 = c.astype('float32')
 xnump = np.hstack([x1.reshape(-1,1),x2.reshape(-1,1)])
 
 x = tf.constant(xnump)
 
-#plt.scatter(xnump[:,0],xnump[:,1],alpha=0.1)
-#plt.show()
+plt.scatter(xnump[:,0],xnump[:,1],alpha=0.1)
+plt.xlabel('x1')
+plt.ylabel('x2')
+plt.title('Original dataset')
+plt.show()
 # quit()
 print ('xnump: ', xnump.shape)
 #xnump = genData.Banana(halfNumSamps)
 #print ('xnump PICK ME: ', xnump)
 #x = tf.constant(xnump)
-#plt.figure()
-#plt.hist(xnump[:,1], bins='auto')
-#plt.show()
+plt.figure()
+plt.hist(xnump[:,0], bins='auto')
+plt.show()
 monoLayer = MonotoneLayer(xnump.shape[1])
 dim = xnump.shape[1]
 #x = np.random.randn(numSamps,1)
@@ -247,6 +255,13 @@ dim = xnump.shape[1]
 #dataset = tf.data.Dataset.from_tensor_slices((x,y))
 # print(x[0,:])
 # print(y[0,:])
+
+def grad_logging(dr):
+    dr_log = tf.log(dr)
+    dr_log_nonan = dr_log
+    dr_log_nonan = tf.where(tf.is_nan(dr_log), tf.zeros_like(dr_log), dr_log)
+    dr_log_nonan = tf.where(tf.is_inf(tf.math.abs(dr_log)), tf.zeros_like(dr_log_nonan), dr_log_nonan)
+    return dr_log_nonan
 
 class GaussianKL:
     def __init__(self,d):
@@ -261,11 +276,20 @@ class GaussianKL:
             g.watch(x)
             #we only use d-1 columns of x for each h() and g() functions (also used in evaluation below)
             #r = monoLayer.genParts[self.d].Evaluate(x[:,:self.d+1]) + monoLayer.monoParts[self.d].Evaluate(x[:,:self.d+1])
-            r = monoLayer.genParts[self.d].Evaluate(x) #[:,:self.d+1])
-            #r1 = monoLayer.genParts[1].Evaluate(x)
-            #print ('r: ', r, r.shape)
+            r0 = monoLayer.genParts[0].Evaluate(x[:,:1])
+            #print ('r0: ', r0, r0.shape)
+            grad = g.gradient(r0,x)
+            print ('dr0: ', grad)
+            dr0 = tf.slice(grad, [0,0],[numSamps,1])
+
+        with tf.GradientTape() as h:  
+            h.watch(x)  
+            r1 = monoLayer.genParts[1].Evaluate(x)
+            #print ('r1: ', r1, r1.shape)
             #print ('x: ', x, x.shape)
-            dr = tf.slice(g.gradient(r, x), [0,self.d],[numSamps,1])
+            grad = h.gradient(r1,x)
+            #print ('dr1: ', grad)
+            dr1 = tf.slice(grad, [0,1],[numSamps,1])
             #dr = g.gradient(r, x)
         #r = monoLayer.genParts[self.d].Evaluate(x) #[:,:self.d+1])
         #print ('r: ', r, r.shape)
@@ -277,13 +301,15 @@ class GaussianKL:
         #print ('second dr test: ', tf.gradients(r,x))
         #dr = g.gradient(r, x)
         #print ('dr: ', dr.numpy(), tf.reduce_sum(dr))
-        dr_log = tf.log(dr)
+        #dr_log = tf.log(dr)
         #print ('dr_log: ', dr_log)
-        dr_log_nonan = dr_log
-        dr_log_nonan = tf.where(tf.is_nan(dr_log), tf.zeros_like(dr_log), dr_log)
-        dr_log_nonan = tf.where(tf.is_inf(tf.math.abs(dr_log)), tf.zeros_like(dr_log_nonan), dr_log_nonan)
+        #dr_log_nonan = dr_log
+        #dr_log_nonan = tf.where(tf.is_nan(dr_log), tf.zeros_like(dr_log), dr_log)
+        #dr_log_nonan = tf.where(tf.is_inf(tf.math.abs(dr_log)), tf.zeros_like(dr_log_nonan), dr_log_nonan)
         #print ('dr_log_nonan: ', dr_log_nonan)
-        return tf.reduce_sum((0.5*tf.square(r) - dr_log_nonan))/float(numSamps)
+        dr_log0 = grad_logging(dr0)
+        dr_log1 = grad_logging(dr1)
+        return tf.reduce_sum((0.5*tf.square(r0) - dr_log0))/float(numSamps) + tf.reduce_sum((0.5*tf.square(r1) - dr_log1))/float(numSamps)
 
 #def animate(i):
 
@@ -292,9 +318,10 @@ bins = 20
 #fig, (ax1) = plt.subplots(nrows=1)
 #line1, = ax1.scatter(xnump[:,0],xnump[:,1])
 n = 7000
-lr = 0.01
+'''
+lr = 0.1
 opt = tf.train.AdamOptimizer(learning_rate=lr)
-for i in range(500):
+for i in range(1000):
     opt.minimize(GaussianKL(0), var_list=monoLayer.trainable_variables)
     #if (GaussianKL(0)().numpy() < 0):
         #print ('Error minimized to 0. Continuing to next dimension.')
@@ -310,10 +337,10 @@ for i in range(500):
         plt.title('Dimension 0 Mapped')
         plt.pause(0.05)
 plt.show()
-
+'''
 #plt.ion()
-lr = 0.01
-opt = tf.train.AdamOptimizer(learning_rate=lr)
+lr = 0.0001
+opt = tf.train.MomentumOptimizer(learning_rate=lr, momentum=0.9, use_nesterov=False)
 for i in range(30000):
     opt.minimize(GaussianKL(1), var_list=monoLayer.trainable_variables)
     #if i == 0:
@@ -324,7 +351,8 @@ for i in range(30000):
     #for var in monoLayer.trainable_variables:
         #print (var)
     print('Dimension 1, Iteration %04d, Objective %04f'%(i,GaussianKL(1)().numpy()))
-    if (i % 100 == 0):
+    if (i % 200 == 0):
+        r0 = monoLayer.genParts[0].Evaluate(xnump[:,0])
         r1 = monoLayer.genParts[1].Evaluate(xnump)
         plt.figure()
         plt.scatter(r0.numpy().ravel(),r1.numpy().ravel(),alpha=0.2)
