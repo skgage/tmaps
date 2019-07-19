@@ -279,7 +279,7 @@ class GaussianKL:
             r0 = monoLayer.genParts[0].Evaluate(x[:,:1])
             #print ('r0: ', r0, r0.shape)
             grad = g.gradient(r0,x)
-            print ('dr0: ', grad)
+            #print ('dr0: ', grad)
             dr0 = tf.slice(grad, [0,0],[numSamps,1])
 
         with tf.GradientTape() as h:  
@@ -300,7 +300,7 @@ class GaussianKL:
         
         #print ('second dr test: ', tf.gradients(r,x))
         #dr = g.gradient(r, x)
-        #print ('dr: ', dr.numpy(), tf.reduce_sum(dr))
+        #print ('dr: ', dr1.numpy(), tf.reduce_sum(dr1))
         #dr_log = tf.log(dr)
         #print ('dr_log: ', dr_log)
         #dr_log_nonan = dr_log
