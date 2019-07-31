@@ -11,6 +11,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import tensorflow as tf
 from tensorflow.keras import layers
+from keras.utils.vis_utils import plot_model
 
 print(tf.VERSION)
 print(tf.keras.__version__)
@@ -188,10 +189,10 @@ class MonotoneLayer(tf.keras.layers.Layer):
         self.num_outputs = dim
         self.dim = dim
 
-        layerSizes_s1 = [8,8,8] 
-        layerSizes_t1 = [8,8,8]
-        layerSizes_s2 = [8,8,8]
-        layerSizes_t2 = [8,8,8]
+        layerSizes_s1 = [4,4,4] 
+        layerSizes_t1 = [4,4,4] 
+        layerSizes_s2 = [4,4,4] 
+        layerSizes_t2 = [4,4,4] 
         #groupSizes = [2,2,2,2] #only used for the min-max layer
         #assert (np.sum(groupSizes) == layerSizes[-1]),"Group sizes must sum to layer size."
         #self.monoParts = [ MonotoneDimension(d, layerSizes, self) for d in range(dim)]
@@ -246,15 +247,9 @@ plt.hist(xnump[:,0], bins='auto')
 plt.show()
 monoLayer = MonotoneLayer(xnump.shape[1])
 dim = xnump.shape[1]
-#x = np.random.randn(numSamps,1)
-#y = x*x*x + x
+#plot_model(monoLayer, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
-#model.fit(x,y,epochs=10,batch_size=100)
 
-#
-#dataset = tf.data.Dataset.from_tensor_slices((x,y))
-# print(x[0,:])
-# print(y[0,:])
 
 def grad_logging(dr):
     dr_log = tf.log(dr)
@@ -290,26 +285,13 @@ class GaussianKL:
             grad = h.gradient(r1,x)
             #print ('dr1: ', grad)
             dr1 = tf.slice(grad, [0,1],[numSamps,1])
-            #dr = g.gradient(r, x)
-        #r = monoLayer.genParts[self.d].Evaluate(x) #[:,:self.d+1])
-        #print ('r: ', r, r.shape)
-        #print ('gradient before slicing: ',g.gradient(r,x))
-        #print ('x: ', x)
-        
-        #dr = tf.slice(r/x, [0,self.d],[numSamps,1])
-        
-        #print ('second dr test: ', tf.gradients(r,x))
-        #dr = g.gradient(r, x)
-        #print ('dr: ', dr1.numpy(), tf.reduce_sum(dr1))
-        #dr_log = tf.log(dr)
-        #print ('dr_log: ', dr_log)
-        #dr_log_nonan = dr_log
-        #dr_log_nonan = tf.where(tf.is_nan(dr_log), tf.zeros_like(dr_log), dr_log)
-        #dr_log_nonan = tf.where(tf.is_inf(tf.math.abs(dr_log)), tf.zeros_like(dr_log_nonan), dr_log_nonan)
-        #print ('dr_log_nonan: ', dr_log_nonan)
+
         dr_log0 = grad_logging(dr0)
         dr_log1 = grad_logging(dr1)
         return tf.reduce_sum((0.5*tf.square(r0) - dr_log0))/float(numSamps) + tf.reduce_sum((0.5*tf.square(r1) - dr_log1))/float(numSamps)
+
+
+
 
 #def animate(i):
 
@@ -339,9 +321,9 @@ for i in range(1000):
 plt.show()
 '''
 #plt.ion()
-lr = 0.0001
-opt = tf.train.MomentumOptimizer(learning_rate=lr, momentum=0.9, use_nesterov=False)
-for i in range(30000):
+lr = 0.01
+opt = tf.train.AdamOptimizer(learning_rate=lr)
+for i in range(500):
     opt.minimize(GaussianKL(1), var_list=monoLayer.trainable_variables)
     #if i == 0:
         #start = monoLayer.trainable_variables
@@ -351,7 +333,7 @@ for i in range(30000):
     #for var in monoLayer.trainable_variables:
         #print (var)
     print('Dimension 1, Iteration %04d, Objective %04f'%(i,GaussianKL(1)().numpy()))
-    if (i % 200 == 0):
+    if (i % 50 == 0):
         r0 = monoLayer.genParts[0].Evaluate(xnump[:,0])
         r1 = monoLayer.genParts[1].Evaluate(xnump)
         plt.figure()

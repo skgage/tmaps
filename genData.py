@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits import mplot3d
+from scipy.stats import invgauss
 
 def Banana(numSamps):
 	np.random.seed(0)
@@ -17,6 +19,24 @@ def Banana(numSamps):
 
 	#plt.plot(x1, x2, 'k.')
 	#plt.show()
+	
+
+	#fig = plt.figure()
+	#ax = plt.axes(projection='3d')
+	zdata = x1a
+	xdata = x2a
+	ydata = x1a
+	#ax.scatter3D(xdata, ydata, zdata, c=zdata.ravel())
+	#plt.show()
+	#print (xdata,ydata,zdata)
+	xnump2 = np.hstack([xdata.reshape(-1,1),ydata.reshape(-1,1),zdata.reshape(-1,1)])
+
+	test = x2b
+	#plt.figure()
+	#plt.hist(test, bins='auto')
+	#plt.show()
+	print (xnump.shape)
 	return xnump
 
-Banana(10)
+
+Banana(8000)
